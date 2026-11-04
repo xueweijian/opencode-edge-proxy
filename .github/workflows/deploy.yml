@@ -23,12 +23,8 @@ jobs:
         env:
           WASMER_TOKEN: ${{ secrets.WASMER_TOKEN }}
         run: |
-          # CLI 7.x 不读 WASMER_TOKEN 环境变量，必须显式 login。
-          # 用 --token 参数，并从 stdin 避免交互提示。
-          wasmer --version
-          echo "--- try: login --token ---"
-          wasmer login --token "$WASMER_TOKEN" 2>&1 || \
-          echo "--- try: login with env ---" && wasmer login 2>&1 || true
+          # wasmer login 的 token 是【位置参数】，不是 --token
+          wasmer login "$WASMER_TOKEN" --no-browser 2>&1 || true
           echo "--- whoami ---"
           wasmer whoami 2>&1 || true
 
