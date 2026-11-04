@@ -20,7 +20,7 @@ jobs:
         run: |
           wasmer --version
           echo "--- whoami ---"
-          wasmer whoami || true
+          wasmer whoami 2>&1 || true
 
       - name: Show project files
         run: |
@@ -31,16 +31,23 @@ jobs:
           cat app.yaml
 
       - name: Deploy to Wasmer Edge
+        id: deploy
         env:
           WASMER_TOKEN: ${{ secrets.WASMER_TOKEN }}
           RUST_LOG: debug
         run: |
           set +e
-          wasmer deploy --non-interactive --owner llm --app-name opencode-proxy 2>&1 | tee /tmp/deploy.log
-          EXIT=${PIPESTATUS[0]}
-          echo "=== EXIT CODE: $EXIT ==="
-          echo "=== LOG (full) ==="
-          cat /tmp/deploy.log
-          echo "=== APP LIST AFTER DEPLOY ==="
-          wasmer app list 2>&1 || true
+          wasmer deploy --non-interactive --owner llm --app-name opencode-proxy > /tmp/deploy.log 2>&1
+          EXIT=$?
+          echo "exit=$EXIT" >> $GITHUB_OUTPUT
+          {
+            echo "## Deploy result: exit=$EXIT"
+            echo '```'
+            cat /tmp/deploy.log
+            echo '```'
+            echo "## wasmer app list"
+            echo '```'
+            wasmer app list 2>&1 || true
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
           exit $EXIT
