@@ -1,0 +1,19 @@
+### env
+wasmer 7.5.0
+### whoami
+2026-11-04T15:29:59.036472Z DEBUG ThreadId(01) hyper_util::client::legacy::connect::http: connecting to 18.204.232.214:443
+2026-11-04T15:29:59.042250Z DEBUG ThreadId(01) hyper_util::client::legacy::connect::http: connected to 18.204.232.214:443
+2026-11-04T15:29:59.102719Z DEBUG ThreadId(01) hyper_util::client::legacy::pool: pooling idle connection for ("https", registry.wasmer.io)
+error: Not logged in registry wasmer.io
+### deploy
+2026-11-04T15:29:59.147064Z DEBUG ThreadId(01) hyper_util::client::legacy::connect::http: connecting to 3.225.11.7:443
+2026-11-04T15:29:59.153042Z DEBUG ThreadId(01) hyper_util::client::legacy::connect::http: connected to 3.225.11.7:443
+2026-11-04T15:29:59.221810Z DEBUG ThreadId(01) hyper_util::client::legacy::pool: pooling idle connection for ("https", registry.wasmer.io)
+It seems you don't have access to llm
+error: Please, change the owner before deploying or check your current user with `wasmer whoami`.
+### exit=1
+### app list
+2026-11-04T15:29:59.248606Z DEBUG ThreadId(01) hyper_util::client::legacy::connect::http: connecting to 52.204.205.193:443
+2026-11-04T15:29:59.254962Z DEBUG ThreadId(01) hyper_util::client::legacy::connect::http: connected to 52.204.205.193:443
+2026-11-04T15:29:59.321731Z DEBUG ThreadId(01) hyper_util::client::legacy::pool: pooling idle connection for ("https", registry.wasmer.io)
+error: not logged in
