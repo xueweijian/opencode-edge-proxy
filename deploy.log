@@ -1,8 +1,41 @@
+### token len = 49
+### token prefix = sk_s
+
+### login (positional)
+Warning: no user found on Ok(Url { scheme: "https", cannot_be_a_base: false, username: "", password: None, host: Some(Domain("wasmer.io")), port: None, path: "/", query: None, fragment: None }) with the provided token.
+Token saved regardless.### login exit = 0
+
 ### whoami
 error: Not logged in registry wasmer.io
+### whoami exit = 1
+
+### config dir listing
+total 68
+drwxr-xr-x  5 runner runner  4096 Nov  4 15:44 .
+drwxr-x--- 12 runner runner  4096 Nov  4 15:43 ..
+-rw-r--r--  1 runner runner 35351 Oct  1 09:08 ATTRIBUTIONS
+-rw-r--r--  1 runner runner  1097 Oct  1 09:08 LICENSE
+drwxr-xr-x  2 runner runner  4096 Oct  1 09:08 bin
+drwxr-xr-x  2 runner runner  4096 Oct  1 09:01 include
+drwxr-xr-x  2 runner runner  4096 Oct  1 09:01 lib
+-rw-r--r--  1 runner runner   137 Nov  4 15:44 wasmer.sh
+-rw-r--r--  1 runner runner   266 Nov  4 15:44 wasmer.toml
+telemetry_enabled = true
+update_notifications_enabled = true
+
+[registry]
+active_registry = "https://registry.wasmer.io/graphql"
+
+[[registry.tokens]]
+registry = "https://registry.wasmer.io/graphql"
+token = "sk***REDACTED***"
+
+[proxy]
+
 ### deploy
 It seems you don't have access to llm
 error: Please, change the owner before deploying or check your current user with `wasmer whoami`.
-### exit=1
+### deploy exit = 1
+
 ### app list
 error: not logged in
