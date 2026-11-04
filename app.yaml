@@ -1,0 +1,7 @@
+kind: wasmer.io/App.v0
+name: opencode-proxy
+package: llm/opencode-proxy@0.1.0
+debug: false
+locality:
+  regions:
+    - us-losa1
