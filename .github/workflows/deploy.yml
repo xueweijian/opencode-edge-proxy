@@ -21,8 +21,6 @@ jobs:
           wasmer --version
           echo "--- whoami ---"
           wasmer whoami || true
-          echo "--- login check ---"
-          wasmer login --help 2>&1 | head -20
 
       - name: Show project files
         run: |
@@ -39,8 +37,10 @@ jobs:
         run: |
           set +e
           wasmer deploy --non-interactive --owner llm --app-name opencode-proxy 2>&1 | tee /tmp/deploy.log
-          EXIT=$?
+          EXIT=${PIPESTATUS[0]}
           echo "=== EXIT CODE: $EXIT ==="
-          echo "=== LOG TAIL ==="
-          tail -60 /tmp/deploy.log
+          echo "=== LOG (full) ==="
+          cat /tmp/deploy.log
+          echo "=== APP LIST AFTER DEPLOY ==="
+          wasmer app list 2>&1 || true
           exit $EXIT
