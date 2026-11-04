@@ -19,21 +19,25 @@ jobs:
           curl https://get.wasmer.io -sSfL | sh
           echo "$HOME/.wasmer/bin" >> $GITHUB_PATH
 
-      - name: Verify Wasmer CLI and token
+      - name: Login to Wasmer registry
+        env:
+          WASMER_TOKEN: ${{ secrets.WASMER_TOKEN }}
         run: |
+          # CLI 7.x 不读 WASMER_TOKEN 环境变量，必须显式 login。
+          # 用 --token 参数，并从 stdin 避免交互提示。
           wasmer --version
+          echo "--- try: login --token ---"
+          wasmer login --token "$WASMER_TOKEN" 2>&1 || \
+          echo "--- try: login with env ---" && wasmer login 2>&1 || true
+          echo "--- whoami ---"
           wasmer whoami 2>&1 || true
 
       - name: Deploy to Wasmer Edge
-        id: deploy
         env:
           WASMER_TOKEN: ${{ secrets.WASMER_TOKEN }}
-          RUST_LOG: debug
         run: |
           set +e
           {
-            echo "### env"
-            wasmer --version 2>&1
             echo "### whoami"
             wasmer whoami 2>&1
             echo "### deploy"
