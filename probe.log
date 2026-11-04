@@ -1,0 +1,229 @@
+### wasmer --version
+wasmer 7.5.0
+
+### wasmer login --help
+Login into Wasmer
+
+Usage: wasmer login [OPTIONS] [TOKEN]
+
+Arguments:
+  [TOKEN]
+          The API token to use when communicating with the registry (inferred from the environment by default)
+          
+          [env: WASMER_TOKEN=sk_smL0rpvWS3m7nyYoUSOwIv1CYsvFb8E1i2kXP3lc0CC57K]
+
+Options:
+      --no-browser
+          Variable to login without opening a browser
+
+  -v, --verbose...
+          Generate verbose output (repeat for more verbosity)
+
+      --wasmer-dir <WASMER_DIR>
+          Set Wasmer's home directory
+          
+          [env: WASMER_DIR=]
+          [default: /home/runner/.wasmer]
+
+      --cache-dir <CACHE_DIR>
+          The directory cached artefacts are saved to
+          
+          [env: WASMER_CACHE_DIR=]
+          [default: /home/runner/.wasmer/cache]
+
+  -q, --quiet
+          Do not print progress messages
+
+      --log-format <LOG_FORMAT>
+          The format to use when generating logs
+
+          Possible values:
+          - text: Human-readable logs
+          - json: Machine-readable logs
+          
+          [env: LOG_FORMAT=]
+          [default: text]
+
+      --registry <REGISTRY>
+          Change the current registry
+          
+          [env: WASMER_REGISTRY=]
+
+      --log-events <LOG_EVENTS>
+          Which span events to log
+          
+          [env: LOG_EVENTS=]
+          [default: close]
+          [possible values: new, close, all]
+
+      --color <COLOR>
+          When to display colored output
+          
+          [default: auto]
+          [possible values: auto, always, never]
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+### wasmer --help
+wasmer 7.5.0
+
+Usage: wasmer [OPTIONS] [COMMAND]
+
+Commands:
+  login            Login into Wasmer
+  auth             Manage authentication in Wasmer
+  publish          Publish a package to a registry [alias: package publish]
+  cache            Manage the local Wasmer cache
+  validate         Validate a WebAssembly binary
+  compile          Compile a WebAssembly binary
+  config           Get various configuration information needed to compile programs which use Wasmer
+  self-update      Update wasmer to the latest version
+  inspect          Inspect a WebAssembly file
+  init             Initializes a new wasmer.toml file
+  wast             Run spec testsuite
+  binfmt           Unregister and/or register wasmer as binfmt interpreter
+  whoami           Shows the current logged in user for the current active registry
+  add              Add a Wasmer package's bindings to your application
+  run              Run a WebAssembly file or Wasmer container
+  journal          Manage journals (compacting, inspecting, filtering, ...)
+  package          Package related commands
+  container        Container related commands. (inspecting, unpacking, ...)
+  deploy           Deploy apps to Wasmer Edge [alias: app deploy]
+  app              Create and manage Wasmer Edge apps
+  cron             Manage cron jobs for Wasmer Edge apps
+  ssh              Run commands/packages on Wasmer Edge in an interactive shell session
+  namespace        Manage Wasmer namespaces
+  domain           Manage DNS records
+  gen-completions  Generate autocompletion for different shells
+  help             Print this message or the help of the given subcommand(s)
+
+Options:
+  -V, --version
+          Print version info and exit
+
+  -v, --verbose...
+          Generate verbose output (repeat for more verbosity)
+
+  -q, --quiet
+          Do not print progress messages
+
+      --log-format <LOG_FORMAT>
+          The format to use when generating logs
+
+          Possible values:
+          - text: Human-readable logs
+          - json: Machine-readable logs
+          
+          [env: LOG_FORMAT=]
+          [default: text]
+
+      --log-events <LOG_EVENTS>
+          Which span events to log
+          
+          [env: LOG_EVENTS=]
+          [default: close]
+          [possible values: new, close, all]
+
+      --color <COLOR>
+          When to display colored output
+          
+          [default: auto]
+          [possible values: auto, always, never]
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+### wasmer config --help
+Get various configuration information needed to compile programs which use Wasmer
+
+Usage: wasmer config [OPTIONS] [COMMAND]
+
+Commands:
+  get   `wasmer config get $KEY`
+  set   `wasmer config set $KEY $VALUE`
+  help  Print this message or the help of the given subcommand(s)
+
+Options:
+      --wasmer-dir <WASMER_DIR>
+          Set Wasmer's home directory
+          
+          [env: WASMER_DIR=]
+          [default: /home/runner/.wasmer]
+
+      --cache-dir <CACHE_DIR>
+          The directory cached artefacts are saved to
+          
+          [env: WASMER_CACHE_DIR=]
+          [default: /home/runner/.wasmer/cache]
+
+  -v, --verbose...
+          Generate verbose output (repeat for more verbosity)
+
+  -q, --quiet
+          Do not print progress messages
+
+      --registry <REGISTRY>
+          Change the current registry
+          
+          [env: WASMER_REGISTRY=]
+
+      --log-format <LOG_FORMAT>
+          The format to use when generating logs
+
+          Possible values:
+          - text: Human-readable logs
+          - json: Machine-readable logs
+          
+          [env: LOG_FORMAT=]
+          [default: text]
+
+      --token <TOKEN>
+          The API token to use when communicating with the registry (inferred from the environment by default)
+          
+          [env: WASMER_TOKEN=sk_smL0rpvWS3m7nyYoUSOwIv1CYsvFb8E1i2kXP3lc0CC57K]
+
+      --log-events <LOG_EVENTS>
+          Which span events to log
+          
+          [env: LOG_EVENTS=]
+          [default: close]
+          [possible values: new, close, all]
+
+      --prefix
+          Print the installation prefix
+
+      --bindir
+          Directory containing Wasmer executables
+
+      --color <COLOR>
+          When to display colored output
+          
+          [default: auto]
+          [possible values: auto, always, never]
+
+      --includedir
+          Directory containing Wasmer headers
+
+      --libdir
+          Directory containing Wasmer libraries
+
+      --libs
+          Libraries needed to link against Wasmer components
+
+      --cflags
+          C compiler flags for files that include Wasmer headers
+
+      --config-path
+          Print the path to the wasmer configuration file where all settings are stored
+
+      --pkg-config
+          Outputs the necessary details for compiling and linking a program to Wasmer, using the `pkg-config` format
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+### token len
+49
+### token prefix
+sk_smL
