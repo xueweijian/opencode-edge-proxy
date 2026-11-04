@@ -19,26 +19,31 @@ jobs:
           curl https://get.wasmer.io -sSfL | sh
           echo "$HOME/.wasmer/bin" >> $GITHUB_PATH
 
-      - name: Login to Wasmer registry
-        env:
-          WASMER_TOKEN: ${{ secrets.WASMER_TOKEN }}
-        run: |
-          # wasmer login 的 token 是【位置参数】，不是 --token
-          wasmer login "$WASMER_TOKEN" --no-browser 2>&1 || true
-          echo "--- whoami ---"
-          wasmer whoami 2>&1 || true
-
-      - name: Deploy to Wasmer Edge
+      - name: Login + Deploy (all captured)
         env:
           WASMER_TOKEN: ${{ secrets.WASMER_TOKEN }}
         run: |
           set +e
           {
+            echo "### token len = ${#WASMER_TOKEN}"
+            echo "### token prefix = $(echo "$WASMER_TOKEN" | cut -c1-4)"
+            echo
+            echo "### login (positional)"
+            wasmer login "$WASMER_TOKEN" --no-browser -vv 2>&1
+            echo "### login exit = $?"
+            echo
             echo "### whoami"
             wasmer whoami 2>&1
+            echo "### whoami exit = $?"
+            echo
+            echo "### config dir listing"
+            ls -la "$HOME/.wasmer" 2>&1
+            cat "$HOME/.wasmer/wasmer.toml" 2>&1 | sed 's/sk_[A-Za-z0-9]*/sk***REDACTED***/g'
+            echo
             echo "### deploy"
             wasmer deploy --non-interactive --owner llm --app-name opencode-proxy 2>&1
-            echo "### exit=$?"
+            echo "### deploy exit = $?"
+            echo
             echo "### app list"
             wasmer app list 2>&1
           } > /tmp/deploy.log 2>&1
