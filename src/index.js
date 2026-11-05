@@ -97,6 +97,58 @@ async function handler(req) {
   }
 
   // --- diagnostics (temporary) -------------------------------------------
+  if (url.pathname.startsWith("/__sse")) {
+    const mode = url.pathname;
+    const body = JSON.stringify({
+      model: "deepseek-v4.1-flash",
+      messages: [{ role: "user", content: "count 1 to 8" }],
+      max_tokens: 60,
+      stream: true,
+    });
+    const up = await fetch("https://opencode.ai/zen/go/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": PROXY_UA,
+        "Authorization": req.headers.get("authorization") || "",
+        "x-opencode-session": "diag0001",
+      },
+      body,
+    });
+    const hdrs = { "Content-Type": "text/event-stream", "x-up": String(up.status) };
+    try {
+      if (mode === "/__sse1") {
+        return new Response(up.body, { status: 200, headers: hdrs });
+      }
+      if (mode === "/__sse2") {
+        // manual pull-based transform, no pipeThrough
+        const ts = new TransformStream({
+          transform(chunk, ctrl) { ctrl.enqueue(chunk); },
+          flush(ctrl) { ctrl.enqueue(new TextEncoder().encode("data: [DONE]\n\n")); },
+        });
+        const w = ts.writable.getWriter();
+        const reader = up.body.getReader();
+        (async () => {
+          try {
+            for (;;) {
+              const r = await reader.read();
+              if (r.done) break;
+              await w.write(r.value);
+            }
+            await w.close();
+          } catch (e) { try { await w.abort(e); } catch {} }
+        })();
+        return new Response(ts.readable, { status: 200, headers: hdrs });
+      }
+      if (mode === "/__sse3") {
+        const txt = await up.text();
+        return new Response(txt + "data: [DONE]\n\n", { status: 200, headers: { "Content-Type": "text/event-stream" } });
+      }
+    } catch (e) {
+      return new Response(JSON.stringify({ __err: String(e && e.message || e) }), { status: 500 });
+    }
+  }
+
   if (url.pathname === "/__diag") {
     const out = { steps: [] };
     try {
