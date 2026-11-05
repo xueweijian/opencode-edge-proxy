@@ -39,13 +39,16 @@ except Exception: print(0)
 if [ "$code" = "200" ] && [ "${n:-0}" -gt 5 ]; then ok "GET /zen/go/v1/models -> $code, $n 个模型"; else bad "models -> $code, count=$n"; fi
 
 echo
-echo "[3] 地理门：muse（必须 OK，否则不是美区出口）"
+echo "[3] 地理门：muse（判据 = 不再出现 RegionError；账户隐私设置导致的拒绝不算失败）"
 resp=$(curl -s --max-time 90 -X POST "$BASE/zen/go/v1/chat/completions" \
   -H "Authorization: Bearer $KEY" -H "User-Agent: cherry-opencode-proxy/1.0" \
   -H "Content-Type: application/json" \
   -d '{"model":"muse-spark-1.2-contributor","messages":[{"role":"user","content":"说 ok"}],"max_tokens":200}')
 if echo "$resp" | grep -q 'RegionError'; then
   bad "muse 报 RegionError —— 出口不是美区，检查 app.yaml 的 locality.regions"
+elif echo "$resp" | grep -q 'train.*on request data'; then
+  # geogate 已过（否则根本走不到这一步），只是账户没开「允许训练数据的付费端点」
+  ok "muse 已绕过地理门（上游改报账户隐私设置，需在 workspace Privacy 里开启）"
 elif echo "$resp" | grep -q '"choices"'; then
   ok "muse 通了（无 RegionError）"
 else
@@ -92,7 +95,8 @@ if [ "$has_stop" -gt 0 ]; then ok "有 finish_reason:stop"; else bad "缺 finish
 echo
 echo "[7] CORS 预检"
 code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 -X OPTIONS "$BASE/zen/go/v1/chat/completions")
-if [ "$code" = "204" ]; then ok "OPTIONS -> 204"; else bad "OPTIONS -> $code"; fi
+# WinterJS 不接受 204 空体，预检返回 200 + Content-Length: 0；两者都算通过
+if [ "$code" = "204" ] || [ "$code" = "200" ]; then ok "OPTIONS -> $code"; else bad "OPTIONS -> $code"; fi
 
 echo
 echo "======================================"
