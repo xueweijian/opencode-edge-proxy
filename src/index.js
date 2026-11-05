@@ -187,16 +187,35 @@ async function handler(req) {
     if (isChatCompletions && contentType.includes("text/event-stream") && upstreamBody) {
       // A streaming body must not carry a stale length.
       resHeaders.delete("content-length");
+      // Upstream behaviour changed: opencode.ai now sometimes DOES emit
+      // finish_reason:"stop" and `data: [DONE]` itself. Blindly appending our
+      // own pair would produce a second (meaningless) terminal frame, and a
+      // strict client stops at the first [DONE], silently dropping anything
+      // after it. So track what the stream already sent and only fill the gaps.
+      const decoder = new TextDecoder();
+      let tail = "";
+      let sawDone = false;
+      let sawFinish = false;
       const transformStream = new TransformStream({
         transform(chunk, controller) {
           controller.enqueue(chunk);
+          // keep a small rolling window: sse frames are line-delimited
+          tail = (tail + decoder.decode(chunk, { stream: true })).slice(-4096);
+          if (tail.includes("[DONE]")) sawDone = true;
+          if (/"finish_reason"\s*:\s*"(stop|length|tool_calls|content_filter)"/.test(tail)) sawFinish = true;
         },
         flush(controller) {
-          // OpenCode's API often closes without sending finish_reason:"stop" and [DONE]
-          // We inject it here so clients like Cherry Studio don't throw AI_FinishReasonError "other"
-          const stopChunk = `data: {"id":"chatcmpl-end","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n`;
-          const doneChunk = `data: [DONE]\n\n`;
-          controller.enqueue(new TextEncoder().encode(stopChunk + doneChunk));
+          // OpenCode's API may close without sending finish_reason:"stop" and [DONE]
+          // We inject the missing parts so clients like Cherry Studio don't throw
+          // AI_FinishReasonError "other".
+          let extra = "";
+          if (!sawFinish) {
+            extra += `data: {"id":"chatcmpl-end","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n`;
+          }
+          if (!sawDone) {
+            extra += `data: [DONE]\n\n`;
+          }
+          if (extra) controller.enqueue(new TextEncoder().encode(extra));
         }
       });
       return new Response(upstreamBody.pipeThrough(transformStream), {
