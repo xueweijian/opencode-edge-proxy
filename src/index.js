@@ -144,6 +144,30 @@ async function handler(req) {
         const txt = await up.text();
         return new Response(txt + "data: [DONE]\n\n", { status: 200, headers: { "Content-Type": "text/event-stream" } });
       }
+      if (mode === "/__sse4") {
+        // exact main-path shape: pipeThrough + statusText + copied headers
+        const ts = new TransformStream({
+          transform(chunk, ctrl) { ctrl.enqueue(chunk); },
+          flush(ctrl) { ctrl.enqueue(new TextEncoder().encode("data: [DONE]\n\n")); },
+        });
+        const rh = new Headers(up.headers);
+        return new Response(up.body.pipeThrough(ts), {
+          status: up.status,
+          statusText: up.statusText,
+          headers: rh,
+        });
+      }
+      if (mode === "/__sse5") {
+        // pipeThrough but with minimal headers (no content-length copy)
+        const ts = new TransformStream({
+          transform(chunk, ctrl) { ctrl.enqueue(chunk); },
+          flush(ctrl) { ctrl.enqueue(new TextEncoder().encode("data: [DONE]\n\n")); },
+        });
+        return new Response(up.body.pipeThrough(ts), {
+          status: up.status,
+          headers: { "Content-Type": "text/event-stream" },
+        });
+      }
     } catch (e) {
       return new Response(JSON.stringify({ __err: String(e && e.message || e) }), { status: 500 });
     }
