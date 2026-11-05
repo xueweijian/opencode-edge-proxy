@@ -96,6 +96,31 @@ async function handler(req) {
     return new Response(JSON.stringify({ status: "healthy", region: "iad1" }), { headers: { "Content-Type": "application/json" }});
   }
 
+  // --- diagnostics (temporary) -------------------------------------------
+  if (url.pathname === "/__diag") {
+    const out = { steps: [] };
+    try {
+      out.steps.push("ct=" + (req.headers.get("content-type") || "none"));
+      const t = await req.text();
+      out.steps.push("text-len=" + t.length);
+      const u = await fetch("https://opencode.ai/zen/go/v1/models", {
+        method: "GET",
+        headers: { "User-Agent": PROXY_UA },
+      });
+      out.steps.push("upstream-get=" + u.status);
+      const p = await fetch("https://opencode.ai/zen/go/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "User-Agent": PROXY_UA },
+        body: t,
+      });
+      out.steps.push("upstream-post=" + p.status);
+    } catch (e) {
+      out.error = String(e && e.message || e);
+      out.stack = String(e && e.stack || "").slice(0, 400);
+    }
+    return new Response(JSON.stringify(out), { headers: { "Content-Type": "application/json" }});
+  }
+
   let targetPath = url.pathname;
   let targetUrl;
   if (targetPath.startsWith("/zen/")) {
