@@ -11,6 +11,9 @@
 //   4. fallback: random UUID (non-JSON / no parseable body, like Zed standalone)
 // UA governance: generic SDK user-agents are rewritten (opencode.ai CF blocks
 // some of them with error 1010, and docs/go asks clients to self-identify).
+//
+// Ported verbatim from the Vercel Edge version; only the entry point differs
+// (WinterCG addEventListener instead of `export default`).
 // ---------------------------------------------------------------------------
 
 const PROXY_UA = "cherry-opencode-proxy/1.0";
@@ -96,131 +99,6 @@ async function handler(req) {
     return new Response(JSON.stringify({ status: "healthy", region: "iad1" }), { headers: { "Content-Type": "application/json" }});
   }
 
-  // --- diagnostics (temporary) -------------------------------------------
-  if (url.pathname.startsWith("/__sse")) {
-    const mode = url.pathname;
-    const body = JSON.stringify({
-      model: "deepseek-v4.1-flash",
-      messages: [{ role: "user", content: "count 1 to 8" }],
-      max_tokens: 60,
-      stream: true,
-    });
-    const up = await fetch("https://opencode.ai/zen/go/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "User-Agent": PROXY_UA,
-        "Authorization": req.headers.get("authorization") || "",
-        "x-opencode-session": "diag0001",
-      },
-      body,
-    });
-    const hdrs = { "Content-Type": "text/event-stream", "x-up": String(up.status) };
-    try {
-      if (mode === "/__sse1") {
-        return new Response(up.body, { status: 200, headers: hdrs });
-      }
-      if (mode === "/__sse2") {
-        // manual pull-based transform, no pipeThrough
-        const ts = new TransformStream({
-          transform(chunk, ctrl) { ctrl.enqueue(chunk); },
-          flush(ctrl) { ctrl.enqueue(new TextEncoder().encode("data: [DONE]\n\n")); },
-        });
-        const w = ts.writable.getWriter();
-        const reader = up.body.getReader();
-        (async () => {
-          try {
-            for (;;) {
-              const r = await reader.read();
-              if (r.done) break;
-              await w.write(r.value);
-            }
-            await w.close();
-          } catch (e) { try { await w.abort(e); } catch {} }
-        })();
-        return new Response(ts.readable, { status: 200, headers: hdrs });
-      }
-      if (mode === "/__sse3") {
-        const txt = await up.text();
-        return new Response(txt + "data: [DONE]\n\n", { status: 200, headers: { "Content-Type": "text/event-stream" } });
-      }
-      if (mode === "/__sse6") {
-        // double .body access (condition then pipe) — hypothesis for the bug
-        const ts = new TransformStream({
-          transform(chunk, ctrl) { ctrl.enqueue(chunk); },
-          flush(ctrl) { ctrl.enqueue(new TextEncoder().encode("data: [DONE]\n\n")); },
-        });
-        if (up.body) {
-          return new Response(up.body.pipeThrough(ts), { status: 200, headers: { "Content-Type": "text/event-stream" } });
-        }
-      }
-      if (mode === "/__sse7") {
-        // single capture + redirect follow, otherwise identical to main path
-        const ts = new TransformStream({
-          transform(chunk, ctrl) { ctrl.enqueue(chunk); },
-          flush(ctrl) { ctrl.enqueue(new TextEncoder().encode("data: [DONE]\n\n")); },
-        });
-        const b = up.body;
-        const rh = new Headers(up.headers);
-        rh.set("x-ocp-session", "diag0001");
-        return new Response(b.pipeThrough(ts), {
-          status: up.status,
-          statusText: up.statusText,
-          headers: rh,
-        });
-      }
-        // exact main-path shape: pipeThrough + statusText + copied headers
-        const ts = new TransformStream({
-          transform(chunk, ctrl) { ctrl.enqueue(chunk); },
-          flush(ctrl) { ctrl.enqueue(new TextEncoder().encode("data: [DONE]\n\n")); },
-        });
-        const rh = new Headers(up.headers);
-        return new Response(up.body.pipeThrough(ts), {
-          status: up.status,
-          statusText: up.statusText,
-          headers: rh,
-        });
-      }
-      if (mode === "/__sse5") {
-        // pipeThrough but with minimal headers (no content-length copy)
-        const ts = new TransformStream({
-          transform(chunk, ctrl) { ctrl.enqueue(chunk); },
-          flush(ctrl) { ctrl.enqueue(new TextEncoder().encode("data: [DONE]\n\n")); },
-        });
-        return new Response(up.body.pipeThrough(ts), {
-          status: up.status,
-          headers: { "Content-Type": "text/event-stream" },
-        });
-      }
-    } catch (e) {
-      return new Response(JSON.stringify({ __err: String(e && e.message || e) }), { status: 500 });
-    }
-  }
-
-  if (url.pathname === "/__diag") {
-    const out = { steps: [] };
-    try {
-      out.steps.push("ct=" + (req.headers.get("content-type") || "none"));
-      const t = await req.text();
-      out.steps.push("text-len=" + t.length);
-      const u = await fetch("https://opencode.ai/zen/go/v1/models", {
-        method: "GET",
-        headers: { "User-Agent": PROXY_UA },
-      });
-      out.steps.push("upstream-get=" + u.status);
-      const p = await fetch("https://opencode.ai/zen/go/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "User-Agent": PROXY_UA },
-        body: t,
-      });
-      out.steps.push("upstream-post=" + p.status);
-    } catch (e) {
-      out.error = String(e && e.message || e);
-      out.stack = String(e && e.stack || "").slice(0, 400);
-    }
-    return new Response(JSON.stringify(out), { headers: { "Content-Type": "application/json" }});
-  }
-
   let targetPath = url.pathname;
   let targetUrl;
   if (targetPath.startsWith("/zen/")) {
@@ -250,11 +128,14 @@ async function handler(req) {
   headers.delete("cf-ray");
   headers.delete("cf-visitor");
   headers.delete("true-client-ip");
+  // body is re-serialized below -> a stale length/encoding breaks the upstream call
+  headers.delete("content-length");
+  headers.delete("content-encoding");
 
   // session injection: only for body-carrying requests (generation endpoints).
   // GET (e.g. /models) untouched; JSON body -> fingerprint / aliases / passthrough.
-  // NOTE WinterJS: touching req.body marks the stream as consumed, so do NOT
-  // evaluate req.body before req.text() — branch first, then read.
+  // NOTE WinterJS: reading req.body marks the stream consumed, so never touch
+  // req.body before req.text() (otherwise "Body already used").
   let bodyInit = null;
   let session = null;
   if (!["GET", "HEAD"].includes(req.method)) {
@@ -300,7 +181,12 @@ async function handler(req) {
     // Gate: only chat-completions-style endpoints get patched; everything else
     // (e.g. /responses) is passed through byte-transparent.
     const isChatCompletions = /\/(chat\/)?completions$/.test(url.pathname);
-    if (isChatCompletions && contentType.includes("text/event-stream") && upstreamRes.body) {
+    // Capture the stream ONCE: WinterJS throws "Response body has already been
+    // used" if the .body getter is evaluated a second time.
+    const upstreamBody = upstreamRes.body;
+    if (isChatCompletions && contentType.includes("text/event-stream") && upstreamBody) {
+      // A streaming body must not carry a stale length.
+      resHeaders.delete("content-length");
       const transformStream = new TransformStream({
         transform(chunk, controller) {
           controller.enqueue(chunk);
@@ -313,14 +199,14 @@ async function handler(req) {
           controller.enqueue(new TextEncoder().encode(stopChunk + doneChunk));
         }
       });
-      return new Response(upstreamRes.body.pipeThrough(transformStream), {
+      return new Response(upstreamBody.pipeThrough(transformStream), {
         status: upstreamRes.status,
         statusText: upstreamRes.statusText,
         headers: resHeaders,
       });
     }
 
-    return new Response(upstreamRes.body, {
+    return new Response(upstreamBody, {
       status: upstreamRes.status,
       statusText: upstreamRes.statusText,
       headers: resHeaders,
@@ -335,10 +221,7 @@ addEventListener("fetch", (event) => {
   event.respondWith(
     handler(event.request).catch((err) =>
       new Response(
-        JSON.stringify({
-          __err: String((err && err.message) || err),
-          __stack: String((err && err.stack) || "").slice(0, 800),
-        }),
+        JSON.stringify({ error: String((err && err.message) || err) }),
         { status: 500, headers: { "Content-Type": "application/json" } }
       )
     )
