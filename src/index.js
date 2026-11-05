@@ -153,7 +153,9 @@ async function handler(req) {
 
   // session injection: only for body-carrying requests (generation endpoints).
   // GET (e.g. /models) untouched; JSON body -> fingerprint / aliases / passthrough.
-  let bodyInit = ["GET", "HEAD"].includes(req.method) ? null : req.body;
+  // NOTE WinterJS: touching req.body marks the stream as consumed, so do NOT
+  // evaluate req.body before req.text() — branch first, then read.
+  let bodyInit = null;
   let session = null;
   if (!["GET", "HEAD"].includes(req.method)) {
     const ct = req.headers.get("content-type") || "";
@@ -161,6 +163,8 @@ async function handler(req) {
     if (ct.includes("json")) {
       bodyText = await req.text();
       bodyInit = bodyText;
+    } else {
+      bodyInit = req.body;
     }
     session = await resolveSession(req, bodyText);
     headers.set("x-opencode-session", session.value);
