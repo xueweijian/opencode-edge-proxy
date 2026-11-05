@@ -228,5 +228,15 @@ async function handler(req) {
 
 // WinterCG 入口：等价于 Vercel 的 export default handler
 addEventListener("fetch", (event) => {
-  event.respondWith(handler(event.request));
+  event.respondWith(
+    handler(event.request).catch((err) =>
+      new Response(
+        JSON.stringify({
+          __err: String((err && err.message) || err),
+          __stack: String((err && err.stack) || "").slice(0, 800),
+        }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      )
+    )
+  );
 });
