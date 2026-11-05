@@ -12,15 +12,15 @@ Logged into registry wasmer.io as user xueweijian163
 
 ### config dir listing
 total 68
-drwxr-xr-x  5 runner runner  4096 Nov  5 00:48 .
-drwxr-x--- 12 runner runner  4096 Nov  5 00:48 ..
+drwxr-xr-x  5 runner runner  4096 Nov  5 00:51 .
+drwxr-x--- 12 runner runner  4096 Nov  5 00:51 ..
 -rw-r--r--  1 runner runner 35351 Oct  1 09:08 ATTRIBUTIONS
 -rw-r--r--  1 runner runner  1097 Oct  1 09:08 LICENSE
 drwxr-xr-x  2 runner runner  4096 Oct  1 09:08 bin
 drwxr-xr-x  2 runner runner  4096 Oct  1 09:01 include
 drwxr-xr-x  2 runner runner  4096 Oct  1 09:01 lib
--rw-r--r--  1 runner runner   137 Nov  5 00:48 wasmer.sh
--rw-r--r--  1 runner runner   285 Nov  5 00:48 wasmer.toml
+-rw-r--r--  1 runner runner   137 Nov  5 00:51 wasmer.sh
+-rw-r--r--  1 runner runner   285 Nov  5 00:51 wasmer.toml
 telemetry_enabled = true
 update_notifications_enabled = true
 
@@ -46,7 +46,7 @@ Manage:  https://wasmer.io/apps/llm/opencode-proxy
 Waiting for new deployment to become available...
 (You can safely stop waiting now with CTRL-C)
 .
-The app version was deployed correctly, but fails with a non-success status code of 500 Internal Server Error
+𖥔 Deployment complete
 ### deploy exit = 0
 
 ### app list
