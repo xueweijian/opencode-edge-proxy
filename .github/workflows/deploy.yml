@@ -5,8 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: write
+concurrency:
+  group: wasmer-deploy
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -19,42 +20,23 @@ jobs:
           curl https://get.wasmer.io -sSfL | sh
           echo "$HOME/.wasmer/bin" >> $GITHUB_PATH
 
-      - name: Login + Deploy (all captured)
+      - name: Bump package version
+        id: bump
+        run: |
+          # Wasmer rejects re-publishing an existing package version, so every
+          # deploy needs a fresh patch number derived from the CI run number.
+          VERSION="0.2.${{ github.run_number }}"
+          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" wasmer.toml
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          grep '^version' wasmer.toml
+
+      - name: Deploy
         env:
           WASMER_TOKEN: ${{ secrets.WASMER_TOKEN }}
         run: |
-          set +e
-          {
-            echo "### token len = ${#WASMER_TOKEN}"
-            echo "### token prefix = $(echo "$WASMER_TOKEN" | cut -c1-4)"
-            echo
-            echo "### login (positional)"
-            wasmer login "$WASMER_TOKEN" --no-browser -vv 2>&1
-            echo "### login exit = $?"
-            echo
-            echo "### whoami"
-            wasmer whoami 2>&1
-            echo "### whoami exit = $?"
-            echo
-            echo "### config dir listing"
-            ls -la "$HOME/.wasmer" 2>&1
-            cat "$HOME/.wasmer/wasmer.toml" 2>&1 | sed 's/sk_[A-Za-z0-9]*/sk***REDACTED***/g'
-            echo
-            echo "### deploy"
-            wasmer deploy --non-interactive --owner llm --app-name opencode-proxy 2>&1
-            echo "### deploy exit = $?"
-            echo
-            echo "### app list"
-            wasmer app list 2>&1
-          } > /tmp/deploy.log 2>&1
-          cat /tmp/deploy.log
-          exit 0
-
-      - name: Commit deploy log back to repo
-        run: |
-          cp /tmp/deploy.log ./deploy.log || echo "no log" > ./deploy.log
-          git config user.email "ci@github.com"
-          git config user.name "ci-bot"
-          git add -f deploy.log
-          git commit -m "ci: deploy log [skip ci]" || echo "nothing to commit"
-          git push || echo "push failed"
+          wasmer login "$WASMER_TOKEN" --no-browser
+          wasmer whoami
+          wasmer deploy --non-interactive --owner llm --app-name opencode-proxy
+          # surface the live URL in the run summary
+          echo "### Deployed \`${{ steps.bump.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "https://wasmer.1ciyuan.cn" >> $GITHUB_STEP_SUMMARY
