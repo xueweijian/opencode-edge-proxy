@@ -144,7 +144,31 @@ async function handler(req) {
         const txt = await up.text();
         return new Response(txt + "data: [DONE]\n\n", { status: 200, headers: { "Content-Type": "text/event-stream" } });
       }
-      if (mode === "/__sse4") {
+      if (mode === "/__sse6") {
+        // double .body access (condition then pipe) — hypothesis for the bug
+        const ts = new TransformStream({
+          transform(chunk, ctrl) { ctrl.enqueue(chunk); },
+          flush(ctrl) { ctrl.enqueue(new TextEncoder().encode("data: [DONE]\n\n")); },
+        });
+        if (up.body) {
+          return new Response(up.body.pipeThrough(ts), { status: 200, headers: { "Content-Type": "text/event-stream" } });
+        }
+      }
+      if (mode === "/__sse7") {
+        // single capture + redirect follow, otherwise identical to main path
+        const ts = new TransformStream({
+          transform(chunk, ctrl) { ctrl.enqueue(chunk); },
+          flush(ctrl) { ctrl.enqueue(new TextEncoder().encode("data: [DONE]\n\n")); },
+        });
+        const b = up.body;
+        const rh = new Headers(up.headers);
+        rh.set("x-ocp-session", "diag0001");
+        return new Response(b.pipeThrough(ts), {
+          status: up.status,
+          statusText: up.statusText,
+          headers: rh,
+        });
+      }
         // exact main-path shape: pipeThrough + statusText + copied headers
         const ts = new TransformStream({
           transform(chunk, ctrl) { ctrl.enqueue(chunk); },
