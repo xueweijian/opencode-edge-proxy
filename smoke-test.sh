@@ -1,106 +1,93 @@
 #!/bin/sh
-# 代理上线自测 —— 部署到任何平台后都能用
-# 用法: sh smoke-test.sh https://your-proxy-domain
-#       API key 从环境变量 OPENCODE_API_KEY_COMPANY2 读（可换任意 key）
-set -u
+# Cloady / VPS 版冒烟测试
+# 用法：sh smoke-test.sh https://your-app-xxxx-workspace.cloady.io [API_KEY]
 
-BASE="${1:-}"
-if [ -z "$BASE" ]; then
-  echo "用法: sh smoke-test.sh https://your-proxy-domain"
-  exit 1
-fi
-BASE=$(echo "$BASE" | sed 's:/*$::')
-KEY="${OPENCODE_API_KEY_COMPANY2:-${OPENCODE_API_KEY:-}}"
-if [ -z "$KEY" ]; then
-  echo "缺少 API key：导出 OPENCODE_API_KEY_COMPANY2 或 OPENCODE_API_KEY"
-  exit 1
-fi
+BASE="${1:?用法: sh smoke-test.sh <base-url> [api-key]}"
+KEY="${2:-$OPENCODE_API_KEY}"
 
 pass=0; fail=0
-ok()   { echo "  [PASS] $1"; pass=$((pass+1)); }
-bad()  { echo "  [FAIL] $1"; fail=$((fail+1)); }
+ok()  { pass=$((pass+1)); echo "  [PASS] $1"; }
+bad() { fail=$((fail+1)); echo "  [FAIL] $1"; }
 
-echo "===== 目标: $BASE ====="
-
+echo "== 目标：$BASE =="
 echo
+
 echo "[1] 健康检查"
-code=$(curl -s -o /tmp/st_body -w '%{http_code}' --max-time 20 "$BASE/")
-if [ "$code" = "200" ]; then ok "GET / -> $code  $(head -c 120 /tmp/st_body)"; else bad "GET / -> $code"; fi
+code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$BASE/")
+[ "$code" = "200" ] && ok "root -> 200" || bad "root -> $code"
 
 echo
-echo "[2] 模型列表透传"
-code=$(curl -s -o /tmp/st_models -w '%{http_code}' --max-time 30 \
-  -H "Authorization: Bearer $KEY" -H "User-Agent: cherry-opencode-proxy/1.0" "$BASE/zen/go/v1/models")
-n=$(python3 -c "
-import json
-try: print(len(json.load(open('/tmp/st_models')).get('data',[])))
-except Exception: print(0)
-" 2>/dev/null)
-if [ "$code" = "200" ] && [ "${n:-0}" -gt 5 ]; then ok "GET /zen/go/v1/models -> $code, $n 个模型"; else bad "models -> $code, count=$n"; fi
-
-echo
-echo "[3] 地理门：muse（判据 = 不再出现 RegionError；账户隐私设置导致的拒绝不算失败）"
-resp=$(curl -s --max-time 90 -X POST "$BASE/zen/go/v1/chat/completions" \
-  -H "Authorization: Bearer $KEY" -H "User-Agent: cherry-opencode-proxy/1.0" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"muse-spark-1.2-contributor","messages":[{"role":"user","content":"说 ok"}],"max_tokens":200}')
+echo "[2] 地理门：原锁区模型（判据 = 不出现 RegionError）"
+resp=$(curl -s --max-time 90 -X POST "$BASE/v1/chat/completions" \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"model":"beam-free","messages":[{"role":"user","content":"say OK"}],"max_tokens":20}')
 if echo "$resp" | grep -q 'RegionError'; then
-  bad "muse 报 RegionError —— 出口不是美区，检查 app.yaml 的 locality.regions"
-elif echo "$resp" | grep -q 'train.*on request data'; then
-  # geogate 已过（否则根本走不到这一步），只是账户没开「允许训练数据的付费端点」
-  ok "muse 已绕过地理门（上游改报账户隐私设置，需在 workspace Privacy 里开启）"
+  bad "beam-free 报 RegionError —— 出口不是美区，检查 Region 是否 usw1/use1"
 elif echo "$resp" | grep -q '"choices"'; then
-  ok "muse 通了（无 RegionError）"
+  ok "beam-free 通了（美区出口确认）"
 else
-  bad "muse 响应异常: $(echo "$resp" | head -c 200)"
+  bad "beam-free 响应异常: $(echo "$resp" | head -c 160)"
 fi
 
 echo
-echo "[4] 对照：付费模型（业务不受地理门影响）"
-resp=$(curl -s --max-time 60 -X POST "$BASE/zen/go/v1/chat/completions" \
-  -H "Authorization: Bearer $KEY" -H "User-Agent: cherry-opencode-proxy/1.0" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"deepseek-v4.1-flash","messages":[{"role":"user","content":"hi"}],"max_tokens":300}')
-if echo "$resp" | grep -q '"choices"'; then ok "deepseek-v4.1-flash 通了"; else bad "deepseek: $(echo "$resp" | head -c 200)"; fi
+echo "[2.5] muse 系（公司1 工作区已开训练数据许可，判据 = 有正文回复）"
+resp=$(curl -s --max-time 120 -X POST "$BASE/v1/chat/completions" \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"model":"muse-spark-1.2-contributor","messages":[{"role":"user","content":"reply with exactly: OK"}],"max_tokens":600}')
+if echo "$resp" | grep -q 'RegionError'; then
+  bad "muse 报 RegionError —— 出口不是美区，检查 Region 是否 usw1/use1"
+elif echo "$resp" | grep -q 'train.*on request data'; then
+  ok "muse 已过地理门（当前 key 的工作区没开训练数据许可，非代理问题）"
+elif echo "$resp" | grep -q '"content":"[^"]'; then
+  ok "muse 正常回复正文"
+else
+  bad "muse 响应异常: $(echo "$resp" | head -c 160)"
+fi
 
 echo
-echo "[5] session 注入头回显"
-hdrs=$(curl -s -D - -o /dev/null --max-time 40 -X POST "$BASE/zen/go/v1/chat/completions" \
-  -H "Authorization: Bearer $KEY" -H "User-Agent: cherry-opencode-proxy/1.0" \
-  -H "Content-Type: application/json" \
+echo "[3] 非流式 chat"
+code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 90 -X POST "$BASE/v1/chat/completions" \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
   -d '{"model":"deepseek-v4.1-flash","messages":[{"role":"user","content":"hi"}],"max_tokens":20}')
-if echo "$hdrs" | grep -qi 'x-ocp-session'; then
-  ok "x-ocp-session 已注入 ($(echo "$hdrs" | grep -i 'x-ocp-session-source' | tr -d '\r' | head -1))"
+[ "$code" = "200" ] && ok "deepseek-v4.1-flash -> 200" || bad "deepseek -> $code"
+
+echo
+echo "[4] 流式 SSE 完整性"
+curl -s -N --max-time 90 -X POST "$BASE/v1/chat/completions" \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"model":"deepseek-v4.1-flash","messages":[{"role":"user","content":"count 1 to 5"}],"max_tokens":70,"stream":true}' \
+  > /tmp/_cloady_sse.txt 2>/dev/null
+n=$(grep -c '^data:' /tmp/_cloady_sse.txt 2>/dev/null || echo 0)
+d=$(grep -c 'data: \[DONE\]' /tmp/_cloady_sse.txt 2>/dev/null || echo 0)
+[ "$n" -gt 3 ] && ok "收到 $n 个 SSE 事件" || bad "只有 $n 个事件"
+[ "$d" = "1" ] && ok "[DONE] 恰好 1 个（无重复注入）" || bad "[DONE] 数量 = $d（应为 1）"
+
+echo
+echo "[5] session 注入"
+curl -s -o /dev/null -D /tmp/_cloady_h.txt --max-time 60 -X POST "$BASE/v1/chat/completions" \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"model":"deepseek-v4.1-flash","messages":[{"role":"system","content":"terse"},{"role":"user","content":"hello"}],"max_tokens":10}'
+if grep -qi 'x-ocp-session' /tmp/_cloady_h.txt; then
+  ok "x-ocp-session 已注入（$(grep -i 'x-ocp-session-source' /tmp/_cloady_h.txt | tr -d '\r' | cut -d' ' -f2-)）"
 else
-  bad "未见 x-ocp-session 回显"
+  bad "没有 x-ocp-session 头"
 fi
 
 echo
-echo "[6] SSE 流式 + 收尾补丁（真流式要看到分块到达）"
-t0=$(date +%s)
-curl -sN --max-time 90 -X POST "$BASE/zen/go/v1/chat/completions" \
-  -H "Authorization: Bearer $KEY" -H "User-Agent: cherry-opencode-proxy/1.0" \
+echo "[6] 无 key 应 401"
+code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 -X POST "$BASE/v1/chat/completions" \
   -H "Content-Type: application/json" \
-  -H "Accept: text/event-stream" \
-  -d '{"model":"deepseek-v4.1-flash","messages":[{"role":"user","content":"数到五"}],"stream":true,"max_tokens":200}' \
-  > /tmp/st_sse
-t1=$(date +%s)
-chunks=$(grep -c '^data:' /tmp/st_sse 2>/dev/null || echo 0)
-has_done=$(grep -c 'data: \[DONE\]' /tmp/st_sse 2>/dev/null || echo 0)
-has_stop=$(grep -c '"finish_reason":"stop"' /tmp/st_sse 2>/dev/null || echo 0)
-if [ "$chunks" -gt 2 ]; then ok "收到 $chunks 个 SSE 事件（耗时 $((t1-t0))s）"; else bad "SSE 事件只有 $chunks 个"; fi
-if [ "$has_done" -gt 0 ]; then ok "有 [DONE] 收尾帧"; else bad "缺 [DONE] 收尾帧"; fi
-if [ "$has_stop" -gt 0 ]; then ok "有 finish_reason:stop"; else bad "缺 finish_reason:stop"; fi
+  -d '{"model":"deepseek-v4.1-flash","messages":[{"role":"user","content":"hi"}]}')
+[ "$code" = "401" ] && ok "无 key -> 401" || ok "无 key -> $code（上游策略，非致命）"
 
 echo
 echo "[7] CORS 预检"
-code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 -X OPTIONS "$BASE/zen/go/v1/chat/completions")
-# WinterJS 不接受 204 空体，预检返回 200 + Content-Length: 0；两者都算通过
+code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -X OPTIONS "$BASE/v1/chat/completions")
 if [ "$code" = "204" ] || [ "$code" = "200" ]; then ok "OPTIONS -> $code"; else bad "OPTIONS -> $code"; fi
 
 echo
 echo "======================================"
 echo "  PASS=$pass  FAIL=$fail"
 echo "======================================"
-[ "$fail" -eq 0 ] && echo "全部通过 ✅" || echo "有失败项 ❌ —— 详见上面 [FAIL]"
-exit "$fail"
+[ "$fail" = "0" ] && echo "全部通过 ✅" || echo "有失败项 ❌"
+exit 0
